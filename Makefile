@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -static
 TARGET = 1806
 
 RELEASE_CFLAGS = -O2 -DNDEBUG
