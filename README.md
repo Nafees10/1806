@@ -44,7 +44,7 @@ sleep 2; systemctl restart udevmon.service
 
 ## Key Mappings
 
-The key mappings are hardcoded. Currently, they key remappings are as follows:
+The key mappings are hardcoded. Currently, they are as follows:
 
 ### Default Layer
 
@@ -72,7 +72,7 @@ Key mappings, when pressed in combination with `KEY_SPACE`:
 - `KEY_1` to `KEY_0` -> `KEY_F1` to `KEY_F10`
 - `KEY_MINUS` -> `KEY_F11`
 - `KEY_EQUAL` -> `KEY_F12`
-- `QWE` `ADS` `ZXCV` -> `789` `456` `1230`
+- `QWE` `ASD` `ZXCV` -> `789` `456` `1230`
 
 > [!NOTE]
 > The above mapping list may go out of date as the program is updated. The
