@@ -1,6 +1,6 @@
 # 1806
 
-Extremely lightweighht
+Extremely lightweight
 [Interception Tools](https://gitlab.com/interception/linux/tools) plugin for
 remapping keys.
 
