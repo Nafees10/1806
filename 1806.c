@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <linux/input.h>
+#include <time.h>
 
 // delay to add in synthesized keys
-#define DELAY_SYNTH_US (10 * 1000)
+#define DELAY_SYNTH_US (20 * 1000)
 
 // delay between double tap keys
 #define DELAY_INPUT_US 100000
@@ -16,8 +17,24 @@
 
 const struct input_event syn = {.type = EV_SYN, .code = SYN_REPORT, .value = UP};
 
-int event_read(struct input_event *event) {
-	return fread(event, sizeof(struct input_event), 1, stdin) == 1;
+typedef int (*layer_map)(struct input_event* ev, size_t toMap, size_t *pressed);
+
+static inline long long time_ms(){
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (ts.tv_sec * 1000LL) + (ts.tv_nsec / 1000000LL);
+}
+
+int global_map(struct input_event *ev){
+	switch (ev->code){
+		case KEY_CAPSLOCK:
+			ev->code = KEY_ESC;
+			return 1;
+		case KEY_ESC:
+			ev->code = KEY_GRAVE;
+			return 1;
+	}
+	return 0;
 }
 
 void event_write(const struct input_event *event) {
@@ -25,19 +42,29 @@ void event_write(const struct input_event *event) {
 		exit(EXIT_FAILURE);
 }
 
+int event_read(struct input_event *event) {
+	while (1){
+		const int ret = fread(event, sizeof(struct input_event), 1, stdin) == 1;
+		if (!ret)
+			return ret;
+		if (event->type != EV_KEY){
+			event_write(event);
+			continue;
+		}
+		global_map(event);
+		return ret;
+	}
+}
+
 void key_act(__u16 code, __s32 value){
 	struct input_event ev = {.type = EV_KEY, .code = code, .value = value};
 	event_write(&ev);
 }
 
-int space_map(struct input_event *ev, size_t *toMap, size_t *pressed){
+int ralt_map(struct input_event *ev, size_t toMap, size_t *state){
 	size_t bit = 0;
-	int code = ev->code;
+	__u16 code = ev->code;
 	switch (ev->code){
-		case KEY_CAPSLOCK:
-			ev->code = KEY_ESC;
-			break;
-
 		case KEY_H:
 			code = KEY_LEFT;
 			bit = (size_t)1 << 0;
@@ -176,88 +203,70 @@ int space_map(struct input_event *ev, size_t *toMap, size_t *pressed){
 			break;
 	}
 	if (!bit // not mapped
-			|| (bit & *toMap) == 0 // not in toMap
-			|| (!ev->value && (bit & *pressed) == 0)) // released, but never pressed under mapping
+			|| (bit & toMap) == 0 // not in toMap
+			|| (!ev->value && (bit & *state) == 0)) // released, but never pressed under mapping
 		return 0;
-	*pressed = (*pressed & ~bit);
+	*state = (*state & ~bit);
 	if (ev->value)
-		*pressed |= bit;
+		*state |= bit;
 	ev->code = code;
 	return 1;
 }
 
-void space_layer(struct timeval time, size_t *pressed){
-	const unsigned long long start_ms = time.tv_sec * 1000 + time.tv_usec / 1000;
-	struct input_event ev;
-	int used = 0;
-	size_t toMap = ~(size_t)0;
-	while (event_read(&ev)){
-		if (ev.type != EV_KEY){
-			event_write(&ev);
-			continue;
-		}
-
-		if (used == 0 && (ev.time.tv_sec * 1000 + ev.time.tv_usec / 1000)
-				- start_ms >= REPEAT_DELAY_MS){
-			key_act(KEY_SPACE, DOWN);
-			event_write(&syn);
-			usleep(DELAY_SYNTH_US);
-			event_write(&ev);
-			while (event_read(&ev)){
-				event_write(&ev);
-				if (ev.type == EV_KEY && ev.code == KEY_SPACE && ev.value == 0)
-					return;
-			}
-			return;
-		}
-
-		if (ev.code == KEY_SPACE){
-			if (ev.value != UP)
-				continue;
-			if (used == 0){
-				key_act(KEY_SPACE, DOWN);
-				event_write(&syn);
-				usleep(DELAY_SYNTH_US);
-				event_write(&ev);
-			}
-			return;
-		}
-		space_map(&ev, &toMap, pressed);
-		event_write(&ev);
-		used |= *pressed;
-	}
-}
+#define BIT_ALT       (1 << 0)
+#define BIT_RET       (1 << 1)
+#define BIT_RET_USED  (1 << 2)
 
 int main(void) {
 	setbuf(stdin, NULL), setbuf(stdout, NULL);
 	struct input_event ev;
-	size_t space_pressed = 0;
+	size_t ralt_state = 0;
+	int state = 0;
 	while (event_read(&ev)) {
-		if (ev.type != EV_KEY){
+		if (ev.value == UP &&
+				(ralt_state && ralt_map(&ev, ralt_state, &ralt_state))
+				){
 			event_write(&ev);
 			continue;
 		}
 
-		if (ev.type == DOWN && ev.code == KEY_SPACE){
-			space_layer(ev.time, &space_pressed);
+		if (ev.code == KEY_ENTER){
+			if (ev.value == UP){
+				if ((state & BIT_RET_USED) == 0){
+					key_act(KEY_ENTER, DOWN);
+					event_write(&syn);
+					usleep(DELAY_SYNTH_US);
+					key_act(KEY_ENTER, UP);
+				} else {
+					key_act(KEY_RIGHTCTRL, UP);
+				}
+				state &= ~(BIT_RET_USED | BIT_RET);
+			} else {
+				state |= BIT_RET;
+			}
 			continue;
 		}
 
-		if (space_pressed && space_map(&ev, &space_pressed, &space_pressed)){
-			event_write(&ev);
+		if (ev.code == KEY_RIGHTALT){
+			if (ev.value){
+				state |= BIT_ALT;
+			} else {
+				state &= ~BIT_ALT;
+			}
 			continue;
 		}
 
-		switch (ev.code){
-		case KEY_CAPSLOCK:
-			ev.code = KEY_ESC;
-			break;
+		if (state & BIT_ALT)
+			ralt_map(&ev, ~(size_t)0, &ralt_state);
 
-		default:
+		if ((state & BIT_RET) && (state & BIT_RET_USED) == 0){
+			state |= BIT_RET_USED;
+			key_act(KEY_RIGHTCTRL, DOWN);
 			event_write(&ev);
+			event_write(&syn);
+			continue;
 		}
 		event_write(&ev);
-
 	}
 	fprintf(stderr, "stdin got EOF. Bye Bye\n");
 }
