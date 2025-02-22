@@ -46,20 +46,11 @@ sleep 2; systemctl restart udevmon.service
 
 The key mappings are hardcoded. Currently, they are as follows:
 
-### Default Layer
-
 - `KEY_CAPSLOCK` -> `KEY_ESCAPE`
-- `KEY_SPACE` -> activates Space Layer
+- `KEY_ESCAPE` -> `KEY_GRAVE`
+- `KEY_RIGHTALT` -> activates `alt_layer`. `KEY_RIGHTALT` itself is never sent
 
-### Space Layer
-
-If `KEY_SPACE` alone is held longer than 300 milliseconds, the layer is
-deactivated, and `KEY_SPACE` press and release events are sent.
-
-If `KEY_SPACE` is pressed and released with no remapped keys unique to this
-layer pressed, then `KEY_SPACE` press and release events are sent.
-
-Key mappings, when pressed in combination with `KEY_SPACE`:
+### `alt_layer`
 
 - `HJKL` -> arrow keys
 - `KEY_O` -> `KEY_HOME`
