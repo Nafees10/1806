@@ -259,7 +259,7 @@ int main(void) {
 		if (state & BIT_ALT)
 			ralt_map(&ev, ~(size_t)0, &ralt_state);
 
-		if ((state & BIT_RET) && (state & BIT_RET_USED) == 0){
+		if (ev.value && (state & BIT_RET) && (state & BIT_RET_USED) == 0){
 			state |= BIT_RET_USED;
 			key_act(KEY_RIGHTCTRL, DOWN);
 			event_write(&ev);
