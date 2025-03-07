@@ -33,6 +33,9 @@ int global_map(struct input_event *ev){
 		case KEY_ESC:
 			ev->code = KEY_GRAVE;
 			return 1;
+		case KEY_SYSRQ:
+			ev->code = KEY_COMPOSE;
+			return 1;
 	}
 	return 0;
 }
